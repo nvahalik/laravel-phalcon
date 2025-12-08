@@ -78,6 +78,12 @@ class Application extends AbstractApplication
      * @var bool
      */
     protected $sendHeaders = true;
+    /**
+     * @var Closure|mixed|null
+     */
+    private ?Closure $dispatcherPrepareCallback = null;
+
+    private string $routedModuleName;
 
     /**
      * Handles a MVC request
@@ -105,63 +111,13 @@ class Application extends AbstractApplication
             return false;
         }
 
-        $router = $container->getShared("router");
-
-        /**
-         * Handle the URI pattern (if any)
-         */
-        $router->handle($uri);
-
-        /**
-         * If a 'match' callback was defined in the matched route
-         * The whole dispatcher+view behavior can be overridden by the developer
-         */
-        $matchedRoute = $router->getMatchedRoute();
-
-        if (is_object($matchedRoute)) {
-            $match = $matchedRoute->getMatch();
-
-            if ($match !== null) {
-                if ($match instanceof Closure) {
-                    $match = Closure::bind($match, $container);
-                }
-
-                /**
-                 * Directly call the match callback
-                 */
-                $possibleResponse = call_user_func_array(
-                    $match,
-                    $router->getParams()
-                );
-
-                /**
-                 * If the returned value is a string return it as body
-                 */
-                if (is_string($possibleResponse)) {
-                    $response = $container->getShared("response");
-
-                    $response->setContent($possibleResponse);
-
-                    return $response;
-                }
-
-                /**
-                 * If the returned string is a ResponseInterface use it as
-                 * response
-                 */
-                if (is_object($possibleResponse) && $possibleResponse instanceof ResponseInterface) {
-                    $possibleResponse->sendHeaders();
-                    $possibleResponse->sendCookies();
-
-                    return $possibleResponse;
-                }
-            }
-        }
+//        $this->oldRouteMatching($container, $uri;
 
         /**
          * If the router doesn't return a valid module we use the default module
          */
-        $moduleName = $router->getModuleName();
+//        $moduleName = $router->getModuleName() ?: ;
+        $moduleName = $this->getModuleName();
 
         if (!$moduleName) {
             $moduleName = $this->defaultModule;
@@ -269,11 +225,15 @@ class Application extends AbstractApplication
          */
         $dispatcher = $container->getShared("dispatcher");
 
-        $dispatcher->setModuleName($router->getModuleName());
-        $dispatcher->setNamespaceName($router->getNamespaceName());
-        $dispatcher->setControllerName($router->getControllerName());
-        $dispatcher->setActionName($router->getActionName());
-        $dispatcher->setParams($router->getParams());
+        if (is_callable($this->dispatcherPrepareCallback)) {
+            call_user_func($this->dispatcherPrepareCallback, $dispatcher);
+        } else {
+            $dispatcher->setModuleName($router->getModuleName());
+            $dispatcher->setNamespaceName($router->getNamespaceName());
+            $dispatcher->setControllerName($router->getControllerName());
+            $dispatcher->setActionName($router->getActionName());
+            $dispatcher->setParams($router->getParams());
+        }
 
         /**
          * Start the view component (start output buffering)
@@ -454,6 +414,77 @@ class Application extends AbstractApplication
     {
         $this->implicitView = $implicitView;
 
+        return $this;
+    }
+
+    public function prepareDispatcherWithRoute(Closure $callable) {
+        $this->dispatcherPrepareCallback = $callable;
+    }
+
+    private function oldRouteMatching($container, $uri)
+    {
+        $router = $container->getShared("router");
+
+        /**
+         * Handle the URI pattern (if any)
+         */
+        $router->handle($uri);
+
+        /**
+         * If a 'match' callback was defined in the matched route
+         * The whole dispatcher+view behavior can be overridden by the developer
+         */
+        $matchedRoute = $router->getMatchedRoute();
+
+        if (is_object($matchedRoute)) {
+            $match = $matchedRoute->getMatch();
+
+            if ($match !== null) {
+                if ($match instanceof Closure) {
+                    $match = Closure::bind($match, $container);
+                }
+
+                /**
+                 * Directly call the match callback
+                 */
+                $possibleResponse = call_user_func_array(
+                    $match,
+                    $router->getParams()
+                );
+
+                /**
+                 * If the returned value is a string return it as body
+                 */
+                if (is_string($possibleResponse)) {
+                    $response = $container->getShared("response");
+
+                    $response->setContent($possibleResponse);
+
+                    return $response;
+                }
+
+                /**
+                 * If the returned string is a ResponseInterface use it as
+                 * response
+                 */
+                if (is_object($possibleResponse) && $possibleResponse instanceof ResponseInterface) {
+                    $possibleResponse->sendHeaders();
+                    $possibleResponse->sendCookies();
+
+                    return $possibleResponse;
+                }
+            }
+        }
+    }
+
+    public function getModuleName()
+    {
+        return $this->routedModuleName;
+    }
+
+    public function setModuleName(string $name)
+    {
+        $this->routedModuleName = $name;
         return $this;
     }
 }
