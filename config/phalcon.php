@@ -22,6 +22,17 @@ return [
     */
     'modules' => [],
 
+
+    /*
+    |--------------------------------------------------------------------------
+    | Autoload Path
+    |--------------------------------------------------------------------------
+    |
+    | If set, this autoloader will be included before processing the routes.
+    |
+    */
+    'autoload_path' => '',
+
     /*
     |--------------------------------------------------------------------------
     | Runtime Behavior
@@ -32,17 +43,6 @@ return [
     |
     */
     'runtime' => [
-
-        /*
-        |--------------------------------------------------------------------------
-        | Ignore Missing Modules
-        |--------------------------------------------------------------------------
-        |
-        | If set to true, the application will not throw an error if a module
-        | defined within a route configuration is missing or unavailable.
-        |
-        */
-        'ignore_missing_modules' => false,
 
         /*
         |--------------------------------------------------------------------------

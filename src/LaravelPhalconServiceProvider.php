@@ -2,7 +2,6 @@
 
 namespace Vahalik\LaravelPhalcon;
 
-use _PHPStan_e870ac104\Nette\Neon\Exception;
 use Illuminate\Foundation\Http\Middleware\ValidateCsrfToken;
 use Illuminate\Foundation\Http\Middleware\VerifyCsrfToken;
 use Illuminate\Routing\Route as IlluminateRoute;
@@ -66,6 +65,7 @@ class LaravelPhalconServiceProvider extends PackageServiceProvider
                 // Class to path.
                 $classes = [($paths['namespace'] ?? $routeNamespace) . '\\' . ucfirst($paths['controller']) . 'Controller' => $route->getPattern()];
                 $actionName = $paths['action'] . 'Action';
+                $realControllerNames = [];
 
                 if (is_numeric($paths['controller'])) {
                     $params = $getRouteParams($route->getPattern(), $paths);
@@ -75,6 +75,7 @@ class LaravelPhalconServiceProvider extends PackageServiceProvider
                         $realControllerNames = array_map(fn ($i) => Str::studly($i), $options);
                         $realPaths = array_map(fn ($i, $idx) => str_replace($params[$paths['controller'] - 1], $options[$idx], $i), $realPaths, array_keys($realPaths));
                         $classes = array_map(fn ($i) => ($paths['namespace'] ?? $routeNamespace) . '\\' . $i . 'Controller', $realControllerNames);
+                        $realControllerNames = array_combine($classes, $realControllerNames);
                         $classes = array_combine($classes, $realPaths);
                     } else {
                         if (! config('phalcon.runtime.ignore_dynamic_controllers', true)) {
@@ -128,6 +129,10 @@ class LaravelPhalconServiceProvider extends PackageServiceProvider
 
                     $pattern = $split->implode('/');
 
+                    if (isset($realControllerNames[$fullClass])) {
+                        $extraParams['controller'] = $realControllerNames[$fullClass];
+                    }
+
                     Route::addRoute($route->getHttpMethods(), $pattern, [$fullClass, $actionName])
                         ->middleware(PhalconCompatability::class)
                         ->where($wheres)
@@ -146,6 +151,10 @@ class LaravelPhalconServiceProvider extends PackageServiceProvider
 
             return $this;
         });
+
+        $this->app->singleton('phalcon.service', Phalcon::class);
+
+        $this->app->singleton(\Phalcon\Di\DiInterface::class, fn ()  => \Phalcon\Di\Di::getDefault());
     }
 
     public function configurePackage(Package $package): void
